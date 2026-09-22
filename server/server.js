@@ -12,12 +12,16 @@ const PORT = process.env.PORT || 5000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'supersecretkey123';
 
 // Setup CORS
-const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://community-feedback-board.vercel.app',
+  process.env.CLIENT_ORIGIN
+].filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-    if (!origin) return callback(null, true);
-    if (origin === allowedOrigin || origin === 'http://localhost:5173') {
+    // Allow mobile apps, curl, server-to-server, or allowed domains
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
     return callback(new Error('Blocked by CORS policy'));
