@@ -1,0 +1,29 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Suggestion {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  category    String    @default("General")
+  authorName  String    @default("Anonymous")
+  votes       Int       @default(0)
+  authorToken String    @default("")
+  comments    Comment[]
+  createdAt   DateTime  @default(now())
+}
+
+model Comment {
+  id           Int        @id @default(autoincrement())
+  content      String
+  authorName   String     @default("Anonymous")
+  suggestionId Int
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+}
