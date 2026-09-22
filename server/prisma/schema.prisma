@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -11,18 +11,20 @@ model Suggestion {
   id          Int       @id @default(autoincrement())
   title       String
   description String
-  category    String    @default("General")
+  category    String    @default("GENERAL")
+  upvotes     Int       @default(0)
   authorName  String    @default("Anonymous")
-  votes       Int       @default(0)
-  authorToken String    @default("")
+  authorToken String?
   comments    Comment[]
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Comment {
   id           Int        @id @default(autoincrement())
   content      String
   authorName   String     @default("Anonymous")
+  authorToken  String?
   suggestionId Int
   suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
