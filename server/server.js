@@ -80,7 +80,7 @@ app.get('/api/suggestions', async (req, res, next) => {
           orderBy: { createdAt: 'asc' }
         }
       },
-      orderBy: { votes: 'desc' }
+      orderBy: { upvotes: 'desc' } // Changed from votes to upvotes
     });
     res.json(suggestions);
   } catch (error) {
@@ -101,7 +101,7 @@ app.post('/api/suggestions', async (req, res, next) => {
         category: validatedData.category,
         authorName: validatedData.authorName || 'Anonymous',
         authorToken: authorToken,
-        votes: 0
+        upvotes: 0 // Changed from votes to upvotes
       },
       include: {
         comments: true
@@ -122,7 +122,7 @@ app.post('/api/suggestions/:id/upvote', async (req, res, next) => {
 
     const updated = await prisma.suggestion.update({
       where: { id },
-      data: { votes: { increment: 1 } },
+      data: { upvotes: { increment: 1 } }, // Changed from votes to upvotes
       include: { comments: true }
     });
 
