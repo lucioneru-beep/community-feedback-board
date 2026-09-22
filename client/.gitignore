@@ -7,7 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# Dependencies (covers root, client/, and server/)
+node_modules/
+**/node_modules/
+
+# Production builds
 dist
 dist-ssr
 *.local
@@ -25,10 +29,25 @@ dist-ssr
 
 # Environment & Secrets
 .env
-.env*.local
+.env*
+!.env.example
 
-# Database
+# Database & SQLite files
 *.db
 *.db-journal
+*.sqlite
+*.sqlite-journal
 dev.db
 dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# AI & IDE Agent tooling folders
+.agents/
+.claude/
+.cursor/
+.devin/
+**/.agents/
+**/.claude/
+**/.cursor/
+**/.devin/
