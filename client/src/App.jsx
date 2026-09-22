@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/suggestions';
-const CATEGORIES = ['All', 'Feature', 'Bug', 'UI/UX', 'General'];
+const CATEGORIES = ['All', 'Feature', 'Bug', 'Improvement', 'General'];
 const TITLE_MAX = 60;
 const DESC_MAX = 200;
 
@@ -40,13 +40,21 @@ export default function App() {
 
   // Authorship & vote tracking
   const [myCreatedIds, setMyCreatedIds] = useState(() => {
-    const saved = localStorage.getItem('my_created_suggestions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('my_created_suggestions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   const [upvotedIds, setUpvotedIds] = useState(() => {
-    const saved = localStorage.getItem('upvoted_suggestions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('upvoted_suggestions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   const [toast, setToast] = useState(null);
@@ -68,9 +76,15 @@ export default function App() {
     try {
       const res = await fetch(API_BASE);
       const data = await res.json();
-      setSuggestions(data);
+      if (Array.isArray(data)) {
+        setSuggestions(data);
+      } else {
+        setSuggestions([]);
+        if (data.error) showToast(data.error, 'error');
+      }
     } catch (err) {
       console.error(err);
+      setSuggestions([]);
       showToast('Could not load suggestions.', 'error');
     } finally {
       setLoading(false);
@@ -88,15 +102,20 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/${id}/upvote`, { method: 'PATCH' });
+      const res = await fetch(`${API_BASE}/${id}/upvote`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok) {
         setSuggestions((prev) =>
-          prev.map((item) => (item.id === id ? { ...item, votes: data.votes } : item))
+          prev.map((item) => (item.id === id ? { ...item, upvotes: data.upvotes ?? (item.upvotes || 0) + 1, votes: data.votes ?? data.upvotes } : item))
         );
         setUpvotedIds((prev) => [...prev, id]);
         showToast('Upvote recorded!');
+      } else {
+        showToast(data.error || 'Failed to record upvote.', 'error');
       }
     } catch {
       showToast('Failed to record upvote.', 'error');
@@ -143,7 +162,7 @@ export default function App() {
       const data = await res.json();
 
       if (res.ok) {
-        setSuggestions([{ ...data, comments: [] }, ...suggestions]);
+        setSuggestions((prev) => [{ ...data, comments: [] }, ...prev]);
         setMyCreatedIds((prev) => [...prev, data.id]);
         setTitle('');
         setDescription('');
@@ -255,7 +274,10 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/${suggestionId}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-author-token': getAuthorToken(),
+        },
         body: JSON.stringify({
           content: text,
           authorName: author || 'Anonymous',
@@ -284,23 +306,31 @@ export default function App() {
     }
   };
 
-  const processedSuggestions = suggestions
+  const safeSuggestions = Array.isArray(suggestions) ? suggestions : [];
+
+  const processedSuggestions = safeSuggestions
     .filter((item) => {
+      const itemCategory = item?.category || 'General';
+      const itemTitle = item?.title || '';
+      const itemDesc = item?.description || '';
+
       const matchesCategory =
         selectedCategory === 'All' ||
-        item.category.toLowerCase() === selectedCategory.toLowerCase();
+        itemCategory.toLowerCase() === selectedCategory.toLowerCase();
 
       const matchesSearch =
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
+        itemTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
 
       return matchesCategory && matchesSearch;
     })
     .sort((a, b) => {
+      const votesA = a?.upvotes ?? a?.votes ?? 0;
+      const votesB = b?.upvotes ?? b?.votes ?? 0;
       if (sortBy === 'votes') {
-        return b.votes - a.votes;
+        return votesB - votesA;
       }
-      return new Date(b.createdAt) - new Date(a.createdAt);
+      return new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0);
     });
 
   return (
@@ -388,7 +418,7 @@ export default function App() {
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="Feature">Feature</option>
             <option value="Bug">Bug Fix</option>
-            <option value="UI/UX">UI/UX</option>
+            <option value="Improvement">Improvement</option>
             <option value="General">General</option>
           </select>
 
@@ -490,8 +520,9 @@ export default function App() {
             const hasVoted = upvotedIds.includes(item.id);
             const isAuthor = myCreatedIds.includes(item.id);
             const isEditing = editingId === item.id;
-            const comments = item.comments || [];
+            const comments = Array.isArray(item.comments) ? item.comments : [];
             const isCommentsOpen = !!expandedComments[item.id];
+            const displayVotes = item.upvotes ?? item.votes ?? 0;
 
             if (isEditing) {
               return (
@@ -526,7 +557,7 @@ export default function App() {
                     >
                       <option value="Feature">Feature</option>
                       <option value="Bug">Bug Fix</option>
-                      <option value="UI/UX">UI/UX</option>
+                      <option value="Improvement">Improvement</option>
                       <option value="General">General</option>
                     </select>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -593,7 +624,7 @@ export default function App() {
                           letterSpacing: '0.05em',
                         }}
                       >
-                        {item.category}
+                        {item.category || 'General'}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: '#64748b' }}>•</span>
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
@@ -623,7 +654,7 @@ export default function App() {
                         transition: 'background 0.2s',
                       }}
                     >
-                      ▲ <span>{item.votes}</span>
+                      ▲ <span>{displayVotes}</span>
                     </button>
 
                     {isAuthor && (
@@ -712,7 +743,7 @@ export default function App() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {comments.map((c) => (
                           <div
-                            key={c.id}
+                            key={c.id || Math.random()}
                             style={{
                               backgroundColor: '#1e293b',
                               padding: '0.6rem 0.85rem',
